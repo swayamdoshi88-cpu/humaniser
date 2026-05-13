@@ -1,0 +1,8 @@
+{
+  "name": "Humanizer",
+  "description": "Easily humanize AI-generated text using 29 research-backed patterns to make finding and removing AI language artifacts quick and simple.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

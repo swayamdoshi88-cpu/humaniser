@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Default primitive definitions
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation for User
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'createdAt']) && 
+             data.keys().size() == 2 && 
+             data.email is string && data.email.size() <= 255 &&
+             data.createdAt == request.time;
+    }
+
+    // Validation for History
+    function isValidHistory(data) {
+      return data.keys().hasAll(['userId', 'originalText', 'finalRewrite', 'createdAt']) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.originalText is string && data.originalText.size() <= 1048576 &&
+             data.finalRewrite is string && data.finalRewrite.size() <= 1048576 &&
+             (!('aiPercentageBefore' in data) || data.aiPercentageBefore is number) &&
+             (!('aiPercentageAfter' in data) || data.aiPercentageAfter is number) &&
+             (!('plagiarismRisk' in data) || data.plagiarismRisk is string) &&
+             data.createdAt == request.time;
+    }
+
+    match /users/{userId} {
+      // Users can only read their own profile
+      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      
+      // Users can only list if the query enforces they are getting their own document
+      allow list: if isSignedIn() && existing().id == request.auth.uid;
+
+      // Users can create their own profile
+      allow create: if isSignedIn() && 
+                       isValidId(userId) && 
+                       request.auth.uid == userId && 
+                       isValidUser(incoming());
+
+      // No updates for now since only email/createdAt are stored
+      allow update: if false;
+      
+      allow delete: if false;
+
+      match /history/{historyId} {
+        allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId && isValidId(historyId);
+        allow list: if isSignedIn() && request.auth.uid == userId;
+        
+        allow create: if isSignedIn() && 
+           isValidId(userId) && 
+           request.auth.uid == userId && 
+           isValidId(historyId) &&
+           isValidHistory(incoming()) && 
+           incoming().userId == request.auth.uid;
+
+        allow update: if false;
+        allow delete: if false;
+      }
+    }
+  }
+}
