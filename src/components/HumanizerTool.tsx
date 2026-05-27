@@ -307,4 +307,4 @@ export default function HumanizerTool() {
     </div>
   );
 }
-```
+
